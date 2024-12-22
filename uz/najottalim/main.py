@@ -1,18 +1,26 @@
-from collections import namedtuple
+import psycopg2
+from AppProperties import *
 
-class Product(namedtuple('Product', ['name', 'price', 'category'])):
-    __slots__ = ()
-    def discount_price(self, discount_percent):
-        return self.price * (1 - discount_percent / 100)
+def get_db_connection():
+    return psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT,
+    )
 
-class User(namedtuple('User', ['username', 'email', 'age'])):
-    __slots__ = ()
-    def is_adult(self):
-        return self.age >= 18
+class Person:
+    @staticmethod
+    def find_all(conn):
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM persons")
+            return cursor.fetchall()
 
-if __name__ == "__main__":
-    product = Product(name="Laptop", price=1000.0, category="Electronics")
-    user = User(username="john_doe", email="john@example.com", age=25)
+    @staticmethod
+    def find_by_id(conn, person_id):
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM persons WHERE id = %s", (person_id,))
+            return cursor.fetchone()
 
-    print(product.discount_price(10))
-    print(user.is_adult())
+conn = get_db_connection()
