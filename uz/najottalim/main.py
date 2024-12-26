@@ -1,26 +1,41 @@
-import psycopg2
-from AppProperties import *
+import requests
+import sqlite3
+import json
+from threading import Thread
 
-def get_db_connection():
-    return psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT,
-    )
+def save_to_database():
+    conn = sqlite3.connect('products.db')
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS products (
+                        id INTEGER PRIMARY KEY, 
+                        title TEXT, 
+                        description TEXT, 
+                        price REAL, 
+                        category TEXT)''')
+    response = requests.get('https://dummyjson.com/products')
+    products = response.json().get('products', [])
+    for product in products:
+        cursor.execute('SELECT id FROM products WHERE id = ?', (product['id'],))
+        if cursor.fetchone() is None:
+            cursor.execute('''INSERT INTO products (id, title, description, price, category) 
+                               VALUES (?, ?, ?, ?, ?)''',
+                               (product['id'], product['title'], product['description'],
+                                product['price'], product['category']))
+    conn.commit()
+    conn.close()
 
-class Person:
-    @staticmethod
-    def get_all_persons():
-        with get_db_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT * FROM persons")
-                return cursor.fetchall()
 
-    @staticmethod
-    def get_one_person(person_id):
-        with get_db_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT * FROM persons WHERE id = %s", (person_id,))
-                return cursor.fetchone()
+def save_to_json():
+    response = requests.get('https://dummyjson.com/products')
+    products = response.json().get('products', [])
+    with open('products.json', 'w') as file:
+        json.dump(products, file)
+
+t1 = Thread(target=save_to_database)
+t2 = Thread(target=save_to_json)
+
+t1.start()
+t2.start()
+
+t1.join()
+t2.join()
